@@ -4,8 +4,9 @@ from typing import Callable
 from numpy_typing import np
 
 
-class StripeImplicitRegressor(BaseEstimator):
-    def __init__(self, weights: np.float64_1d = None, step_function: float | Callable=1, eps: float=.5, corrections_max=np.inf, _is_fitted=False):
+class StripeImplicit(BaseEstimator):
+    def __init__(self, weights: np.float64_1d = None, step_function: float | Callable = 1, eps: float = .5,
+                 corrections_max=np.inf, _is_fitted=False):
         """
         Инициализация
         :param weights: изначальные веса
@@ -24,7 +25,7 @@ class StripeImplicitRegressor(BaseEstimator):
 
     def fit(
             self,
-            X: np.float64_1d,
+            X: np.float64_2d,
             y: np.float64_1d
     ):
         """
@@ -48,13 +49,16 @@ class StripeImplicitRegressor(BaseEstimator):
                 step_multiplier = self.step_function
             else:
                 raise ValueError("Bad step function type.")
-            
-            future_weights = self.weights - (features.dot(self.weights) - answer) / (0.5 / step_multiplier + features_norm_square) * features
+
+            future_weights = self.weights - (features.dot(self.weights) - answer) / (
+                    0.5 / step_multiplier + features_norm_square) * features
 
             future_weights_residual = features.dot(future_weights) - answer
-            beta_k = future_weights_residual ** 2 * (
-                    1 + 2 * step_multiplier * features_norm_square)
-            
+
+            gradient = 2 * features * future_weights_residual
+
+            beta_k = future_weights_residual**2 + step_multiplier / 2 * gradient.dot(gradient)
+
             if beta_k > self.eps:
                 self.weights = future_weights
                 corrections_made += 1
@@ -63,21 +67,19 @@ class StripeImplicitRegressor(BaseEstimator):
         self.corrections_made = corrections_made
         self._is_fitted = True
         return self
-    
+
     def predict(self, X):
         check_is_fitted(self)
         return X.dot(self.weights)
-    
+
     def __sklearn_is_fitted__(self):
         return self._is_fitted
-    
-    def get_params(self, deep = True):
-         return {param: getattr(self, param)
+
+    def get_params(self, deep=True):
+        return {param: getattr(self, param)
                 for param in self._param_names}
 
     def set_params(self, **parameters):
         for parameter, value in parameters.items():
             setattr(self, parameter, value)
         return self
-
-
